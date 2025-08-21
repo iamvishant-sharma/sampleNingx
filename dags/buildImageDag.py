@@ -1,7 +1,7 @@
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 import datetime
-from airflow.utils.dates import days_ago
+#from airflow.utils.dates import days_ago
 from base_path import get_base_path
 
 DAG_ID = "build_container_image"
@@ -9,7 +9,7 @@ SECOPS_WAREHOUSE_PATH= f"{get_base_path()}/secops-warehouse"
 
 default_args = {
     'owner': 'security',
-    'start_date': days_ago(1),
+    'start_date': datetime(2023, 1, 1),
     'retries': 1,
     'retry_delay': datetime.timedelta(minutes=1),
 }
