@@ -1,33 +1,43 @@
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-from datetime import datetime
+import datetime
+from airflow.utils.dates import days_ago
+from base_path import get_base_path
+
+DAG_ID = "build_container_image"
+SECOPS_WAREHOUSE_PATH= f"{get_base_path()}/secops-warehouse"
+
+default_args = {
+    'owner': 'security',
+    'start_date': days_ago(1),
+    'retries': 1,
+    'retry_delay': datetime.timedelta(minutes=1),
+}
 
 with DAG(
-    dag_id="kpo_build_image",
-    start_date=datetime(2023, 1, 1),
+    dag_id=DAG_ID,
     schedule_interval=None,
+    default_args=default_args,
     catchup=False,
+    tags=['build', 'container', 'images'],
+    doc_md="""
+    # Build Container Images
+    """
 ) as dag:
 
-    build = KubernetesPodOperator(
-        task_id="build_image",
-        name="kaniko-build",
-        namespace="default",
-        image="gcr.io/kaniko-project/executor:latest",   # Kaniko builder
+    build_image = KubernetesPodOperator(
+        task_id='build_hello_world_with_kaniko',
+        name='kaniko-build',
+        namespace='orchestrix',  # your Airflow namespace
+        image='gcr.io/kaniko-project/executor:latest',
+        image_pull_secrets=[{"name": "spr-nexus"}],
         cmds=["/kaniko/executor"],
         arguments=[
-            "--dockerfile=/workspace/Dockerfile",
-            "--context=git://github.com/your-org/your-repo.git",  # or /workspace mount
-            "--destination=your-dockerhub-user/hello-world:latest"
+            f"--context={SECOPS_WAREHOUSE_PATH}",
+            "--dockerfile=build_container_image/Dockerfile",  # relative to context
+            "--destination=prod-nexus.sprinklr.com:8123/hello-world:v1",
         ],
-        volume_mounts=[{
-            "name": "docker-config",
-            "mountPath": "/kaniko/.docker/"
-        }],
-        volumes=[{
-            "name": "docker-config",
-            "secret": {"secretName": "docker-registry-secret"}
-        }],
+        get_logs=True,
         is_delete_operator_pod=True,
+        in_cluster=True,
     )
-
